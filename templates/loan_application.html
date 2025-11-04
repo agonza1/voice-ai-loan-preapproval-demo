@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loan Application - Secure Pre-Approval</title>
+    <link rel="stylesheet" href="/static/css/loan_application.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Loan Pre-Approval Application</h1>
+            <p>Fast, secure, and easy - Get pre-approved in minutes</p>
+        </div>
+        
+        <div class="form-container">
+            <form id="loanForm" method="POST" action="/loan-application">
+                
+                <!-- Personal Information Section -->
+                <div class="form-section">
+                    <h2>Personal Information</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="legal_name">Legal Name <span class="required">*</span></label>
+                            <input type="text" id="legal_name" name="legal_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dob">Date of Birth <span class="required">*</span></label>
+                            <input type="date" id="dob" name="dob" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="email">Email Address <span class="required">*</span></label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">Phone Number <span class="required">*</span></label>
+                            <input type="tel" id="phone" name="phone" placeholder="(555) 123-4567" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ssn_last4">SSN Last 4 Digits <span class="required">*</span></label>
+                        <input type="text" id="ssn_last4" name="ssn_last4" maxlength="4" pattern="[0-9]{4}" placeholder="1234" required>
+                        <span class="info-tooltip">Used for identity verification and credit score estimation</span>
+                    </div>
+                </div>
+                
+                <!-- Financial & Loan Information Section -->
+                <div class="form-section">
+                    <h2>Loan Details</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="monthly_income">Monthly Income <span class="required">*</span></label>
+                            <input type="number" id="monthly_income" name="monthly_income" min="0" step="100" placeholder="$0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="requested_amount">Requested Loan Amount <span class="required">*</span></label>
+                            <input type="number" id="requested_amount" name="requested_amount" min="1000" step="1000" placeholder="$10,000" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="purpose_of_loan">Purpose of Loan <span class="required">*</span></label>
+                        <select id="purpose_of_loan" name="purpose_of_loan" required>
+                            <option value="">Select</option>
+                            <option value="debt_consolidation">Debt Consolidation</option>
+                            <option value="home_improvement">Home Improvement</option>
+                            <option value="major_purchase">Major Purchase</option>
+                            <option value="business">Business</option>
+                            <option value="medical">Medical Expenses</option>
+                            <option value="education">Education</option>
+                            <option value="vacation">Vacation</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Consent & Agreement Section -->
+                <div class="form-section">
+                    <h2>Consent & Agreement</h2>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="terms_consent" name="terms_consent" required>
+                        <label for="terms_consent">I agree to the <a href="#" target="_blank">Terms and Conditions</a> and <a href="#" target="_blank">Privacy Policy</a>. <span class="required">*</span></label>
+                    </div>
+                </div>
+                
+                <button type="submit" class="submit-btn">Submit Application</button>
+                
+                <div class="security-note">
+                    <strong>🔒 Your security matters:</strong> All information is encrypted and transmitted securely. We use industry-standard SSL encryption to protect your data.
+                </div>
+            </form>
+            
+            <div id="success-message" class="success-message" style="display: none;">
+                <h3>Application Submitted Successfully!</h3>
+                <p>Thank you for your application. We'll review it and get back to you shortly.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/loan_application.js"></script>
+</body>
+</html>

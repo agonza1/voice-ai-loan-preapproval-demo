@@ -29,6 +29,7 @@ A multilingual voice AI conversation partner built with FastAPI and Pipecat that
   - Deepgram
   - ElevenLabs
   - Twilio Account SID and Auth Token
+- **For local development with Twilio**: ngrok or similar tunneling service (to expose your local server to receive webhook requests)
 
 ## Local Development
 
@@ -47,6 +48,24 @@ A multilingual voice AI conversation partner built with FastAPI and Pipecat that
    ```bash
    uvicorn main:app --host 0.0.0.0 --port 8000
    ```
+
+4. **Set up tunneling for Twilio webhooks** (required for testing with phone calls):
+   
+   Twilio needs a publicly accessible URL to send webhook requests to your local server. Use a tunneling service like ngrok:
+   
+   ```bash
+   # Install ngrok (if not already installed)
+   # Visit https://ngrok.com/download or use: brew install ngrok / snap install ngrok
+   
+   # Start ngrok tunnel to your local server
+   ngrok http 8000
+   ```
+   
+   Copy the HTTPS URL from ngrok (e.g., `https://abc123.ngrok.io`) and configure it in your Twilio console:
+   - Go to your Twilio Phone Number settings
+   - Set the webhook URL for incoming calls to: `https://your-ngrok-url.ngrok.io/`
+   
+   **Note**: For WebSocket support, ensure ngrok is configured for WebSocket connections (ngrok's free tier supports this by default when using `http` protocol).
 
 ## Deployment
 
