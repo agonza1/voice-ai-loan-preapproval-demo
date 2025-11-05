@@ -71,8 +71,22 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 @app.get("/loan-application")
-async def loan_application_form():
-    """Serve the loan application form"""
+async def loan_application_form(
+    legal_name: Optional[str] = None,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+    zip_code: Optional[str] = None,
+):
+    """Serve the loan application form with optional pre-fill parameters
+    
+    Query parameters:
+    - legal_name: Pre-fill the legal name field
+    - email: Pre-fill the email field
+    - phone: Pre-fill the phone field
+    - zip_code: Pre-fill the zip code field (if added to form)
+    
+    Example: /loan-application?legal_name=John%20Doe&email=john@example.com&phone=5551234567
+    """
     template_path = TEMPLATES_DIR / "loan_application.html"
     try:
         html_content = template_path.read_text(encoding="utf-8")
