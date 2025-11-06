@@ -3,18 +3,20 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, Request, Form
+from fastapi import FastAPI, WebSocket, Request, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.responses import HTMLResponse
 from loguru import logger
 from typing import Optional
+from pydantic import BaseModel, EmailStr
 
 # Load environment variables from .env file
 load_dotenv()
 
 from bot import main
+from email_service import get_email_service
 
 # Get the base directory
 BASE_DIR = Path(__file__).parent
@@ -158,4 +160,72 @@ async def submit_loan_application(
         return JSONResponse(
             status_code=400,
             content={"success": False, "detail": str(e)}
+        )
+
+
+# Email service test endpoint
+
+class SendEmailRequest(BaseModel):
+    """Request model for sending test email"""
+    email: EmailStr
+    name: str
+    link: str
+    expires_in_hours: Optional[int] = 24
+
+
+@app.post("/test-email")
+async def test_send_email(request: SendEmailRequest = Body(...)):
+    """Test endpoint to send an email with application link via MailerSend"""
+    try:
+        email_service = get_email_service()
+        
+        if not email_service.api_key:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": "MAILERSEND_API_KEY not configured",
+                    "message": "Please set MAILERSEND_API_KEY in your environment variables"
+                }
+            )
+        
+        success = await email_service.send_application_link(
+            email=request.email,
+            name=request.name,
+            link=request.link,
+            expires_in_hours=request.expires_in_hours
+        )
+        
+        if success:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "Email sent successfully",
+                    "recipient": {
+                        "email": request.email,
+                        "name": request.name
+                    },
+                    "link": request.link,
+                    "expires_in_hours": request.expires_in_hours
+                }
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "message": "Failed to send email"
+                }
+            )
+        
+    except Exception as e:
+        logger.error(f"Error sending test email: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "message": "An error occurred while sending the email"
+            }
         )

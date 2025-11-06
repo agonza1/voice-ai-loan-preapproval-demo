@@ -1,33 +1,58 @@
-# Voice AI Agent Example
+# Voice AI Loan Pre-Approval Demo
 
-A multilingual voice AI conversation partner built with FastAPI and Pipecat that helps English speakers learn other languages through real-time voice conversations.
+A Voice AI Twilio demo for automated loan pre-approval. This application captures basic applicant information over a phone call, simulates credit scoring, applies decision rules, and can escalate to a human for review.
+
+## 📚 Documentation
+
+For comprehensive architecture, API reference, and integration documentation, see the [`docs/`](./docs/) folder:
+- [Architecture Overview](./docs/architecture.md)
+- [API Reference](./docs/api-reference.md)
+- [High-Level Flow](./docs/high-level-flow.md)
+- [Components](./docs/components.md)
+- [Integrations](./docs/integrations.md)
+- [AI Context Guide](./docs/AI_CONTEXT.md) - Essential context for AI-assisted development tools
 
 ## Features
 
-- Real-time voice conversations via WebSocket
-- Speech-to-Text using Deepgram
-- AI-powered responses with OpenAI GPT-4
-- Text-to-Speech using ElevenLabs
-- Twilio integration for phone calls
-- Multilingual support
-- Dynamic WebSocket URL generation for different deployment environments
+- **Real-time voice conversations** via WebSocket with Twilio
+- **Automated loan pre-approval workflow**:
+  - Collects applicant information (name, phone, zip code)
+  - Explains soft credit inquiry (no impact on credit score)
+  - Sends secure link to complete application
+- **Web-based loan application form** with pre-filled data from voice call
+- **Speech-to-Text** using Deepgram for accurate transcription
+- **AI-powered conversation** with OpenAI GPT-4o for natural dialogue
+- **Text-to-Speech** using ElevenLabs for professional voice responses
+- **Dynamic WebSocket URL generation** for different deployment environments
 
 ## Architecture
 
-- **FastAPI**: Web framework with WebSocket support
-- **Pipecat**: Audio processing pipeline
-- **Twilio**: Phone call integration
-- **Deepgram**: Speech recognition
-- **OpenAI**: Language model for conversations
-- **ElevenLabs**: Text-to-speech synthesis
+- **FastAPI**: Web framework with WebSocket support and form handling
+- **Pipecat**: Audio processing pipeline for real-time voice interactions
+- **Twilio**: Phone call integration and media streaming
+- **Deepgram**: Speech recognition for converting voice to text
+- **OpenAI GPT-4o**: Language model for conversational loan pre-approval assistant
+- **ElevenLabs**: Text-to-speech synthesis for natural voice responses
+
+## Workflow
+
+### Voice Call Flow
+
+1. **Opening**: AI greets caller and introduces the quick pre-approval service
+2. **Consent Checkpoint**: Explains soft credit inquiry that doesn't impact credit score
+3. **Data Collection**: Gathers:
+   - Full name (legal name)
+   - Mobile number (to send secure link)
+   - Zip code
+4. **Link Handoff**: Sends secure link to complete application and offers to stay on the line
 
 ## Prerequisites
 
 - Python 3.12+
 - API keys for:
-  - OpenAI
-  - Deepgram
-  - ElevenLabs
+  - OpenAI (GPT-4o)
+  - Deepgram (Speech-to-Text)
+  - ElevenLabs (Text-to-Speech)
   - Twilio Account SID and Auth Token
 - **For local development with Twilio**: ngrok or similar tunneling service (to expose your local server to receive webhook requests)
 
@@ -43,6 +68,14 @@ A multilingual voice AI conversation partner built with FastAPI and Pipecat that
    cp .env.example .env
    # Edit .env with your API keys
    ```
+
+   Required environment variables:
+   - `OPENAI_API_KEY`
+   - `DEEPGRAM_API_KEY`
+   - `ELEVENLABS_API_KEY`
+   - `TWILIO_ACCOUNT_SID`
+   - `TWILIO_AUTH_TOKEN`
+   - `WEBSOCKET_URL` (optional, auto-generated if not set)
 
 3. **Run the application**:
    ```bash
@@ -82,6 +115,7 @@ A multilingual voice AI conversation partner built with FastAPI and Pipecat that
    - `ELEVENLABS_API_KEY`
    - `TWILIO_ACCOUNT_SID`
    - `TWILIO_AUTH_TOKEN`
+   - `WEBSOCKET_URL` (optional)
 
 3. **Deploy**:
    ```bash
@@ -115,18 +149,21 @@ A multilingual voice AI conversation partner built with FastAPI and Pipecat that
 
 ## API Endpoints
 
-- `POST /` - Returns TwiML with WebSocket URL for Twilio
-- `WebSocket /ws` - Real-time audio streaming endpoint
+- `POST /` - Returns TwiML with WebSocket URL for Twilio voice calls
+- `WebSocket /ws` - Real-time audio streaming endpoint for voice conversations
+- `GET /loan-application` - Serves the loan application form (supports query parameters: `legal_name`, `email`, `phone`, `zip_code` for pre-filling)
+- `POST /loan-application` - Handles loan application form submission
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `OPENAI_API_KEY` | OpenAI API key for GPT-4 |
+| `OPENAI_API_KEY` | OpenAI API key for GPT-4o |
 | `DEEPGRAM_API_KEY` | Deepgram API key for speech recognition |
 | `ELEVENLABS_API_KEY` | ElevenLabs API key for text-to-speech |
 | `TWILIO_ACCOUNT_SID` | Twilio Account SID |
 | `TWILIO_AUTH_TOKEN` | Twilio Auth Token |
+| `WEBSOCKET_URL` | (Optional) WebSocket URL for Twilio connections. If not set, auto-generated from request headers |
 
 ## How It Works
 
@@ -151,3 +188,7 @@ cerebrium delete cerebrium-demo
 cd infrastructure
 tofu destroy
 ```
+
+## License
+
+MIT License
