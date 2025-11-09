@@ -66,7 +66,7 @@ TWILIO_AUTH_TOKEN=your_auth_token_here
 
 ### Purpose
 - Real-time voice processing pipeline
-- Orchestrates STT (Deepgram) → LLM (OpenAI) → TTS (ElevenLabs)
+- Orchestrates STT (Deepgram) → LLM (OpenAI) → TTS (OpenAI)
 
 ### Service Details
 - **Framework**: Pipecat
@@ -81,7 +81,7 @@ WebSocket Input → STT → LLM → TTS → WebSocket Output
 ### Services Used
 - **Deepgram STT**: Speech-to-text (`nova-2-general` model)
 - **OpenAI GPT-4o**: Conversational AI
-- **ElevenLabs TTS**: Text-to-speech (`eleven_multilingual_v2`)
+- **OpenAI TTS**: Text-to-speech (`ballad`, `alloy`)
 
 ### Configuration
 
@@ -89,7 +89,6 @@ WebSocket Input → STT → LLM → TTS → WebSocket Output
 ```bash
 DEEPGRAM_API_KEY=your_deepgram_api_key
 OPENAI_API_KEY=sk-...
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
 ```
 
 ### Implementation
@@ -98,7 +97,7 @@ ELEVENLABS_API_KEY=your_elevenlabs_api_key
 ```python
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+from pipecat.services.openai.tts import OpenAITTSService
 from pipecat.transports.network.fastapi_websocket import FastAPIWebsocketTransport
 
 # STT
@@ -111,10 +110,9 @@ stt = DeepgramSTTService(
 llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
 # TTS
-tts = ElevenLabsTTSService(
-    api_key=os.getenv("ELEVENLABS_API_KEY"),
-    model="eleven_multilingual_v2",
-    voice_id="Xb7hH8MSUJpSbSDYk0k2"
+tts = OpenAITTSService(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    voice="ballad",
 )
 
 # Pipeline
@@ -303,7 +301,6 @@ TWILIO_AUTH_TOKEN=...
 # Pipecat Services
 DEEPGRAM_API_KEY=...
 OPENAI_API_KEY=sk-...
-ELEVENLABS_API_KEY=...
 
 # MailerSend
 MAILERSEND_API_KEY=...

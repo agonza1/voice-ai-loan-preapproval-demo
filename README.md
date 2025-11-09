@@ -22,7 +22,7 @@ For comprehensive architecture, API reference, and integration documentation, se
 - **Web-based loan application form** with pre-filled data from voice call
 - **Speech-to-Text** using Deepgram for accurate transcription
 - **AI-powered conversation** with OpenAI GPT-4o for natural dialogue
-- **Text-to-Speech** using ElevenLabs for professional voice responses
+- **Text-to-Speech** using OpenAI TTS voices (ballad + alloy) for natural dialogue
 - **Dynamic WebSocket URL generation** for different deployment environments
 
 ## Architecture
@@ -31,8 +31,8 @@ For comprehensive architecture, API reference, and integration documentation, se
 - **Pipecat**: Audio processing pipeline for real-time voice interactions
 - **Twilio**: Phone call integration and media streaming
 - **Deepgram**: Speech recognition for converting voice to text
-- **OpenAI GPT-4o**: Language model for conversational loan pre-approval assistant
-- **ElevenLabs**: Text-to-speech synthesis for natural voice responses
+- **OpenAI GPT-4.1-mini**: Language model for conversational loan pre-approval assistant
+- **OpenAI TTS**: Text-to-speech synthesis for natural voice responses
 
 ## Workflow
 
@@ -50,9 +50,8 @@ For comprehensive architecture, API reference, and integration documentation, se
 
 - Python 3.12+
 - API keys for:
-  - OpenAI (GPT-4o)
+  - OpenAI (gpt-4.1-mini + Text-to-Speech)
   - Deepgram (Speech-to-Text)
-  - ElevenLabs (Text-to-Speech)
   - Twilio Account SID and Auth Token
 - **For local development with Twilio**: ngrok or similar tunneling service (to expose your local server to receive webhook requests)
 
@@ -72,7 +71,6 @@ For comprehensive architecture, API reference, and integration documentation, se
    Required environment variables:
    - `OPENAI_API_KEY`
    - `DEEPGRAM_API_KEY`
-   - `ELEVENLABS_API_KEY`
    - `TWILIO_ACCOUNT_SID`
    - `TWILIO_AUTH_TOKEN`
    - `WEBSOCKET_URL` (optional, auto-generated if not set)
@@ -112,7 +110,6 @@ For comprehensive architecture, API reference, and integration documentation, se
 2. **Configure secrets in Cerebrium dashboard**:
    - `OPENAI_API_KEY`
    - `DEEPGRAM_API_KEY`
-   - `ELEVENLABS_API_KEY`
    - `TWILIO_ACCOUNT_SID`
    - `TWILIO_AUTH_TOKEN`
    - `WEBSOCKET_URL` (optional)
@@ -152,7 +149,7 @@ For comprehensive architecture, API reference, and integration documentation, se
 - `POST /` - Returns TwiML with WebSocket URL for Twilio voice calls
 - `WebSocket /ws` - Real-time audio streaming endpoint for voice conversations
 - `GET /loan-application` - Serves the loan application form (supports query parameters: `legal_name`, `email`, `phone`, `zip_code` for pre-filling)
-- `POST /loan-application` - Handles loan application form submission
+- `POST /loan-application` - Handles loan application form submission, evaluates the application via DecisionRules, and emails the applicant with an approval or denial notification
 
 ## Environment Variables
 
@@ -160,10 +157,18 @@ For comprehensive architecture, API reference, and integration documentation, se
 |----------|-------------|
 | `OPENAI_API_KEY` | OpenAI API key for GPT-4o |
 | `DEEPGRAM_API_KEY` | Deepgram API key for speech recognition |
-| `ELEVENLABS_API_KEY` | ElevenLabs API key for text-to-speech |
 | `TWILIO_ACCOUNT_SID` | Twilio Account SID |
 | `TWILIO_AUTH_TOKEN` | Twilio Auth Token |
+| `MAILERSEND_API_KEY` | MailerSend API key for decision notification emails |
+| `MAILERSEND_FROM_EMAIL` | Sender email address for MailerSend (defaults to `loans@yourcompany.com`) |
+| `DECISION_RULES_API_KEY` | DecisionRules solver/API key used to call the rules engine |
+| `DECISION_RULES_RULE_ID` | DecisionRules rule ID to evaluate loan applications |
+| `DECISION_RULES_HOST` | (Optional) DecisionRules API host, defaults to `https://api.decisionrules.io` |
+| `CREDIT_SCORE_API_URL` | (Optional) Mock credit bureau endpoint used for logging credit score lookups |
 | `WEBSOCKET_URL` | (Optional) WebSocket URL for Twilio connections. If not set, auto-generated from request headers |
+| `COMPANY_NAME` | (Optional) Overrides the default company branding used in prompts |
+
+> **Note:** The application also accepts the legacy environment variable names (`DECISIONRULES_SOLVER_KEY`, `DECISIONRULES_RULE_ID`, etc.) for backward compatibility.
 
 ## How It Works
 

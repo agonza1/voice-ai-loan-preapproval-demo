@@ -21,7 +21,7 @@ For developers new to the project, start with:
 
 This is a voice-enabled loan pre-approval system that:
 - Captures applicant information via voice calls (Twilio)
-- Uses AI-powered conversation (OpenAI GPT-4o) with STT (Deepgram) and TTS (ElevenLabs)
+- Uses AI-powered conversation (OpenAI GPT-4o) with STT (Deepgram) and TTS (OpenAI voices)
 - Evaluates loan eligibility using DecisionRules
 - Sends secure links via Email (MailerSend) for application completion
 - Handles edge cases with human escalation

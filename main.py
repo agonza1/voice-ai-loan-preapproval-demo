@@ -1,15 +1,17 @@
+import asyncio
 import json
 import os
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Optional, Tuple
 
+import aiohttp
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, Request, Form, Body
+from fastapi import Body, FastAPI, Form, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
-from starlette.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
-from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 # Load environment variables from .env file
@@ -70,7 +72,8 @@ async def websocket_endpoint(websocket: WebSocket):
     stream_sid = call_data["start"]["streamSid"]
     call_sid = call_data["start"].get("callSid")
     logger.info(f"Starting voice AI session with stream_sid: {stream_sid}, call_sid: {call_sid}")
-    await main(websocket, stream_sid, call_sid)
+    company_name = os.getenv("COMPANY_NAME")
+    await main(websocket, stream_sid, call_sid, company_name=company_name)
 
 
 @app.get("/loan-application")
@@ -100,6 +103,68 @@ async def loan_application_form(
             content="<h1>Template file not found</h1>",
             status_code=500
         )
+
+
+def _extract_decision_outcome(payload: Any) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Attempt to extract a decision outcome and optional reason from a DecisionRules response.
+    This utility is defensive and will try multiple common keys to find usable values.
+    """
+    if payload is None:
+        return None, None
+
+    if isinstance(payload, dict):
+        for decision_key in ("decision", "result", "status", "outcome", "approved"):
+            value = payload.get(decision_key)
+            if isinstance(value, str):
+                reason = (
+                    payload.get("reason")
+                    or payload.get("explanation")
+                    or payload.get("details")
+                )
+                if isinstance(reason, dict):
+                    reason = json.dumps(reason)
+                elif reason is not None:
+                    reason = str(reason)
+                return value, reason
+
+        for nested_key in ("outputs", "result", "results", "data"):
+            nested = payload.get(nested_key)
+            if nested is not None:
+                decision, reason = _extract_decision_outcome(nested)
+                if decision:
+                    return decision, reason
+
+    if isinstance(payload, list):
+        for item in payload:
+            decision, reason = _extract_decision_outcome(item)
+            if decision:
+                return decision, reason
+
+    if isinstance(payload, str):
+        return payload, None
+
+    return None, None
+
+
+async def _fetch_mock_credit_score(legal_name: str, ssn_last4: str) -> dict:
+    """
+    Mock fetching a credit score from a third-party service.
+
+    Although this is a mock, we keep the async interface and logging to mirror the real workflow.
+    """
+    credit_api_url = os.getenv("CREDIT_SCORE_API_URL", "https://mock-credit-bureau.local/credit-score")
+    logger.info(f"Requesting credit score from {credit_api_url} for {legal_name} (SSN last4: {ssn_last4})")
+    await asyncio.sleep(0.1)
+
+    mocked_response = {
+        "creditScore": 720,
+        "creditHistory": "Good standing with no delinquencies in the past 24 months.",
+        "source": "MockCreditBureau",
+        "requestedAt": datetime.utcnow().isoformat() + "Z",
+    }
+    logger.debug(f"Mock credit score response: {json.dumps(mocked_response)}")
+    return mocked_response
 
 
 @app.post("/loan-application")
@@ -141,18 +206,112 @@ async def submit_loan_application(
         logger.info(f"Loan application submitted: {legal_name} ({email})")
         logger.debug(f"Application data: {json.dumps(application_data, indent=2)}")
         
-        # In a real application, you would:
-        # 1. Save to database
-        # 2. Run credit check
-        # 3. Send confirmation email
-        # 4. Trigger approval process
-        
+        application_id = f"APP-{hash(legal_name + email + dob) % 1000000:06d}"
+
+        credit_profile = await _fetch_mock_credit_score(legal_name, ssn_last4)
+        credit_score = credit_profile.get("creditScore")
+
+        application_data["financial"]["credit_score"] = credit_score
+
+        decision_rules_api_key = os.getenv("DECISION_RULES_API_KEY") or os.getenv("DECISIONRULES_SOLVER_KEY")
+        decision_rules_rule_id = os.getenv("DECISION_RULES_RULE_ID") or os.getenv("DECISIONRULES_RULE_ID")
+        decision_rules_host = (
+            os.getenv("DECISION_RULES_HOST")
+            or os.getenv("DECISIONRULES_HOST")
+            or "https://api.decisionrules.io"
+        )
+
+        decision_response_payload: Any = None
+        decision_outcome: Optional[str] = None
+        decision_reason: Optional[str] = None
+
+        if not decision_rules_api_key or not decision_rules_rule_id:
+            raise ValueError("DecisionRules configuration is missing. Please set DECISION_RULES_API_KEY (or DECISIONRULES_SOLVER_KEY) and DECISION_RULES_RULE_ID.")
+
+        decision_input = {
+            "ApplicationId": application_id,
+            "ApplicantName": legal_name,
+            "ApplicantEmail": email,
+            "MonthlyIncome": monthly_income,
+            "RequestedAmount": requested_amount,
+            "PurposeOfLoan": purpose_of_loan,
+            "ConsentGiven": terms_consent is not None,
+            "DebtToIncomeRatio": round(requested_amount / monthly_income, 2) if monthly_income else None,
+            "CreditScore": credit_score,
+        }
+
+        decision_url = f"{decision_rules_host.rstrip('/')}/rule/solve/{decision_rules_rule_id}"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {decision_rules_api_key}",
+        }
+
+        logger.info(f"Submitting application {application_id} to DecisionRules at {decision_url}")
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
+                async with session.post(decision_url, headers=headers, json={"data": decision_input}) as response:
+                    if response.status >= 400:
+                        error_text = await response.text()
+                        logger.error(f"Decision Rules API error {response.status}: {error_text}")
+                        raise ValueError(f"Decision Rules API error {response.status}")
+                    decision_response_payload = await response.json()
+                    logger.info(f"Decision received for {application_id}: {json.dumps(decision_response_payload)}")
+        except aiohttp.ClientError as exc:
+            logger.error(f"Failed to reach Decision Rules API: {exc}")
+            raise ValueError("Unable to reach Decision Rules API") from exc
+
+        decision_outcome, decision_reason = _extract_decision_outcome(decision_response_payload)
+        logger.info(f"Parsed decision for {application_id}: outcome={decision_outcome}, reason={decision_reason}")
+
+        if not decision_outcome:
+            raise ValueError("Decision Rules response did not include a recognizable decision outcome")
+
+        email_service = get_email_service()
+        email_sent = False
+        email_error: Optional[str] = None
+
+        decision_outcome_normalized = decision_outcome.lower()
+        is_approved = "approve" in decision_outcome_normalized or "yes" in decision_outcome_normalized or decision_outcome_normalized == "true"
+
+        if not email_service.api_key:
+            email_error = "MAILERSEND_API_KEY not configured"
+            logger.error("Cannot send decision email: MAILERSEND_API_KEY not configured")
+        else:
+            if is_approved:
+                email_sent = await email_service.send_approval_notification(
+                    email=email,
+                    name=legal_name,
+                    approval_amount=requested_amount,
+                    application_id=application_id
+                )
+                if not email_sent:
+                    email_error = "Failed to send approval email"
+            else:
+                email_sent = await email_service.send_denial_notification(
+                    email=email,
+                    name=legal_name,
+                    reason=decision_reason,
+                    application_id=application_id
+                )
+                if not email_sent:
+                    email_error = "Failed to send denial email"
+
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
                 "message": "Application submitted successfully",
-                "application_id": f"APP-{hash(legal_name + email + dob) % 1000000:06d}",
+                "application_id": application_id,
+                "credit_assessment": credit_profile,
+                "decision": {
+                    "outcome": decision_outcome,
+                    "reason": decision_reason,
+                    "raw": decision_response_payload,
+                },
+                "email": {
+                    "sent": email_sent,
+                    "error": email_error,
+                },
             }
         )
     

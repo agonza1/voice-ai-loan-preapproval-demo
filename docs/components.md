@@ -59,15 +59,14 @@ WebSocket Input → STT → Context Aggregator (User) → LLM → TTS → WebSoc
 - **DeepgramSTTService**: Speech-to-text service
 - **OpenAILLMService**: Language model for conversation
 - **OpenAILLMContext**: Conversation context management
-- **ElevenLabsTTSService**: Text-to-speech service
+- **OpenAITTSService**: Text-to-speech service
 - **SileroVADAnalyzer**: Voice activity detection
 
 **Configuration**:
 - **STT Model**: `nova-2-general` (Deepgram)
 - **STT Language**: `multi` (multilingual)
 - **LLM Model**: `gpt-4o` (OpenAI)
-- **TTS Model**: `eleven_multilingual_v2` (ElevenLabs)
-- **TTS Voice ID**: `Xb7hH8MSUJpSbSDYk0k2`
+- **TTS Voices**: `ballad` (welcome concierge), `alloy` (loan specialist) via OpenAI TTS
 
 **System Prompt**:
 The LLM follows a structured workflow:
@@ -85,7 +84,6 @@ The LLM follows a structured workflow:
 - twilio
 - openai
 - deepgram (via pipecat)
-- elevenlabs (via pipecat)
 
 ---
 
@@ -229,22 +227,21 @@ The LLM follows a structured workflow:
 
 ---
 
-### 9. ElevenLabs TTS Integration
+### 9. OpenAI TTS Integration
 
 **Purpose**: Text-to-speech synthesis for voice responses
 
-**Service**: ElevenLabs Text-to-Speech API
+**Service**: OpenAI Text-to-Speech API (via Pipecat)
 
 **Configuration**:
-- API Key: `ELEVENLABS_API_KEY` environment variable
-- Model: `eleven_multilingual_v2`
-- Voice ID: `Xb7hH8MSUJpSbSDYk0k2`
+- API Key: `OPENAI_API_KEY` environment variable
+- Voices: `ballad` (welcome concierge) and `alloy` (loan specialist)
 
-**Integration**: Via Pipecat `ElevenLabsTTSService`
+**Integration**: Via Pipecat `OpenAITTSService`
 
 **Processing**:
 - Receives text from LLM
-- Converts to natural-sounding speech
+- Converts to natural-sounding speech with the configured voice
 - Streams audio to WebSocket for Twilio
 
 ---

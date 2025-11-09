@@ -1,5 +1,5 @@
 torch>=2.0.0
-pipecat-ai[silero,daily,openai,deepgram,elevenlabs,twilio]==0.0.63
+pipecat-ai[silero,daily,openai,deepgram,twilio]==0.0.63
 aiohttp>=3.9.4
 torchaudio>=2.3.0
 channels>=4.0.0
@@ -14,6 +14,3 @@ loguru>=0.7.0
 # Compatibility and integrations
 pydantic>=2.8.0,<3.0
 pydantic-settings>=2.2
-email-validator>=2.0.0
-openai[realtime]>=1.68.2
-livekit-plugins-openai==1.0.18

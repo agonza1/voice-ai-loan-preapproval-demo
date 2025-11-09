@@ -27,7 +27,7 @@ result = await solver.solve("loan-approval", data={...}, version="latest")
 ```
 
 ## Environment Variables
-`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `DEEPGRAM_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `MAILERSEND_API_KEY`, `DECISIONRULES_SOLVER_KEY`, `WEBSOCKET_URL` (optional)
+`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `DEEPGRAM_API_KEY`, `OPENAI_API_KEY`, `MAILERSEND_API_KEY`, `DECISIONRULES_SOLVER_KEY`, `WEBSOCKET_URL` (optional)
 
 ## Implementation Status
 ✅ Voice call, WebSocket, STT/LLM/TTS pipeline, form  

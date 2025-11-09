@@ -116,7 +116,7 @@ curl -X POST https://your-domain.com/ \
 
 **Pipeline Flow**:
 ```
-WebSocket Input → STT (Deepgram) → LLM (OpenAI) → TTS (ElevenLabs) → WebSocket Output
+WebSocket Input → STT (Deepgram) → LLM (OpenAI) → TTS (OpenAI) → WebSocket Output
 ```
 
 **Event Handlers**:
@@ -294,7 +294,7 @@ curl -X POST https://your-domain.com/loan-application \
 
 **Generation**:
 - LLM generates text response
-- ElevenLabs TTS converts to speech
+- OpenAI TTS converts to speech
 - Audio sent via WebSocket to Twilio
 
 ---
@@ -352,7 +352,6 @@ Required environment variables for API functionality:
 |----------|-------------|----------|
 | `OPENAI_API_KEY` | OpenAI API key for GPT-4o | Yes |
 | `DEEPGRAM_API_KEY` | Deepgram API key for STT | Yes |
-| `ELEVENLABS_API_KEY` | ElevenLabs API key for TTS | Yes |
 | `TWILIO_ACCOUNT_SID` | Twilio Account SID | Yes |
 | `TWILIO_AUTH_TOKEN` | Twilio Auth Token | Yes |
 | `WEBSOCKET_URL` | WebSocket URL override | No |
