@@ -14,3 +14,6 @@ loguru>=0.7.0
 # Compatibility and integrations
 pydantic>=2.8.0,<3.0
 pydantic-settings>=2.2
+email-validator>=2.0.0
+openai[realtime]>=1.68.2
+livekit-plugins-openai==1.0.18
