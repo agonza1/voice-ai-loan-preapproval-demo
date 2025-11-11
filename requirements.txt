@@ -1,5 +1,5 @@
 torch>=2.0.0
-pipecat-ai[silero,daily,openai,deepgram,twilio]==0.0.63
+pipecat-ai[cartesia,silero,daily,openai,deepgram,twilio]==0.0.63
 aiohttp>=3.9.4
 torchaudio>=2.3.0
 channels>=4.0.0

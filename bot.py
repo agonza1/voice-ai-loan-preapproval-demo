@@ -5,8 +5,17 @@ import re
 import asyncio
 
 from loguru import logger
-from pipecat.frames.frames import LLMMessagesFrame, EndFrame
+from pipecat.frames.frames import (
+    LLMMessagesFrame,
+    EndFrame,
+    ErrorFrame,
+    Frame,
+    StartFrame,
+    CancelFrame,
+    SystemFrame,
+)
 from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 
@@ -16,6 +25,7 @@ from pipecat.processors.aggregators.openai_llm_context import (
 )
 from pipecat.services.deepgram.stt import DeepgramSTTService, LiveOptions
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from twilio.rest import Client
 from pipecat.transports.network.fastapi_websocket import (
     FastAPIWebsocketTransport,
@@ -24,6 +34,7 @@ from pipecat.transports.network.fastapi_websocket import (
 from pipecat.serializers.twilio import TwilioFrameSerializer
 
 from pipecat.services.openai.tts import OpenAITTSService
+from pipecat.services.cartesia import CartesiaTTSService
 from email_service import get_email_service
 
 DEFAULT_COMPANY_NAME = "companyABC"
@@ -31,6 +42,92 @@ WELCOME_AGENT_NAME = "Eliza"
 LOAN_AGENT_NAME = "Blake"
 WELCOME_VOICE = "nova"
 LOAN_VOICE = "alloy"
+CARTESIA_MODEL = os.getenv("CARTESIA_MODEL", "sonic-3")
+CARTESIA_WELCOME_VOICE_ID = os.getenv("CARTESIA_WELCOME_VOICE_ID")
+CARTESIA_LOAN_VOICE_ID = os.getenv("CARTESIA_LOAN_VOICE_ID")
+
+
+class DynamicGateProcessor(FrameProcessor):
+    def __init__(self, *, start_open: bool = False):
+        super().__init__()
+        self._is_open = start_open
+        self._buffer: list[tuple[Frame, FrameDirection]] = []
+        self._lock = asyncio.Lock()
+
+    async def open(self):
+        buffered: list[tuple[Frame, FrameDirection]] = []
+        async with self._lock:
+            if self._is_open:
+                return
+            self._is_open = True
+            buffered = self._buffer
+            self._buffer = []
+        if buffered:
+            logger.debug(f"{self.name} flushing {len(buffered)} buffered frames")
+        for frame, direction in buffered:
+            await self.push_frame(frame, direction)
+
+    async def close(self):
+        async with self._lock:
+            self._is_open = False
+            self._buffer = []
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, SystemFrame) or direction == FrameDirection.UPSTREAM:
+            await self.push_frame(frame, direction)
+            return
+
+        async with self._lock:
+            if self._is_open:
+                should_push = True
+            else:
+                self._buffer.append((frame, direction))
+                should_push = False
+
+        if should_push:
+            await self.push_frame(frame, direction)
+
+
+class PrimaryTTSMonitor(FrameProcessor):
+    def __init__(self, *, backup_gate: DynamicGateProcessor):
+        super().__init__()
+        self._backup_gate = backup_gate
+        self._fallback_engaged = False
+
+    async def _reset(self):
+        self._fallback_engaged = False
+        await self._backup_gate.close()
+
+    async def rearm(self):
+        await self._reset()
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, StartFrame):
+            await self._reset()
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, (EndFrame, CancelFrame)):
+            await self._reset()
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, ErrorFrame):
+            if not self._fallback_engaged:
+                self._fallback_engaged = True
+                logger.warning("Cartesia TTS emitted an error. Falling back to OpenAI TTS.")
+                await self._backup_gate.open()
+            await self.push_frame(frame, direction)
+            return
+
+        if self._fallback_engaged and direction == FrameDirection.DOWNSTREAM and not isinstance(frame, SystemFrame):
+            return
+
+        await self.push_frame(frame, direction)
 
 def build_welcome_system_prompt(company_name: str) -> str:
     return f"""
@@ -244,10 +341,52 @@ async def main(websocket_client, stream_sid, call_sid=None, company_name=None):
     )
     
 
-    tts = OpenAITTSService(
+    openai_tts = OpenAITTSService(
         api_key=openai_api_key,
         voice=WELCOME_VOICE,
     )
+
+    cartesia_api_key = os.getenv("CARTESIA_API_KEY")
+    cartesia_welcome_voice_id = CARTESIA_WELCOME_VOICE_ID
+    cartesia_loan_voice_id = CARTESIA_LOAN_VOICE_ID or cartesia_welcome_voice_id
+    cartesia_voice_ids = {
+        "welcome": cartesia_welcome_voice_id,
+        "loan": cartesia_loan_voice_id,
+    }
+
+    cartesia_tts: CartesiaTTSService | None = None
+    cartesia_fallback_gate: DynamicGateProcessor | None = None
+    cartesia_primary_monitor: PrimaryTTSMonitor | None = None
+    tts_stage: FrameProcessor = openai_tts
+
+    if cartesia_api_key and cartesia_welcome_voice_id:
+        try:
+            cartesia_tts = CartesiaTTSService(
+                api_key=cartesia_api_key,
+                voice_id=cartesia_welcome_voice_id,
+                model=CARTESIA_MODEL,
+            )
+            cartesia_fallback_gate = DynamicGateProcessor(start_open=False)
+            cartesia_primary_monitor = PrimaryTTSMonitor(backup_gate=cartesia_fallback_gate)
+            tts_stage = ParallelPipeline(
+                [
+                    cartesia_tts,
+                    cartesia_primary_monitor,
+                ],
+                [
+                    openai_tts,
+                    cartesia_fallback_gate,
+                ],
+            )
+            logger.info("Cartesia TTS enabled as primary with OpenAI TTS fallback.")
+        except Exception as exc:
+            logger.error(f"Failed to initialize Cartesia TTS, defaulting to OpenAI only: {exc}")
+            cartesia_tts = None
+            cartesia_fallback_gate = None
+            cartesia_primary_monitor = None
+            tts_stage = openai_tts
+    elif cartesia_api_key or cartesia_welcome_voice_id or cartesia_loan_voice_id:
+        logger.warning("Incomplete Cartesia configuration detected; using OpenAI TTS only.")
 
     messages = [
         {
@@ -299,7 +438,7 @@ async def main(websocket_client, stream_sid, call_sid=None, company_name=None):
             stt,  # Speech-To-Text
             context_aggregator.user(),
             llm,  # LLM
-            tts,  # Text-To-Speech
+            tts_stage,  # Text-To-Speech with Cartesia fallback
             transport.output(),  # Websocket output to client
             context_aggregator.assistant(),
         ]
@@ -307,18 +446,29 @@ async def main(websocket_client, stream_sid, call_sid=None, company_name=None):
     
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
     
-    def set_tts_voice(voice_name: str):
-        if not voice_name:
+    async def set_agent_voice(agent_key: str):
+        if agent_key not in ("welcome", "loan"):
             return
-        try:
-            if hasattr(tts, "set_voice"):
-                tts.set_voice(voice_name)
-            else:
-                tts.voice = voice_name  # type: ignore[attr-defined]
-        except Exception:
-            logger.warning("Unable to set TTS voice dynamically")
 
-    set_tts_voice(WELCOME_VOICE)
+        openai_voice = WELCOME_VOICE if agent_key == "welcome" else LOAN_VOICE
+        try:
+            if hasattr(openai_tts, "set_voice"):
+                openai_tts.set_voice(openai_voice)
+            else:
+                openai_tts.voice = openai_voice  # type: ignore[attr-defined]
+        except Exception:
+            logger.warning("Unable to set OpenAI TTS voice dynamically")
+
+        cartesia_voice_id = cartesia_voice_ids.get(agent_key)
+        if cartesia_tts and cartesia_voice_id:
+            try:
+                cartesia_tts.set_voice(cartesia_voice_id)
+            except Exception:
+                logger.warning("Unable to set Cartesia TTS voice dynamically")
+            if cartesia_primary_monitor:
+                await cartesia_primary_monitor.rearm()
+
+    await set_agent_voice("welcome")
 
     NUDGE_MESSAGES = {
         "awaiting_name": "Reminder: Confirm the caller's full legal name before proceeding.",
@@ -370,7 +520,7 @@ async def main(websocket_client, stream_sid, call_sid=None, company_name=None):
         last_invalid_email_attempt = None
         pending_email_candidate = None
         loan_intro_noted = False
-        set_tts_voice(LOAN_VOICE)
+        await set_agent_voice("loan")
         
         messages[:] = [
             {
