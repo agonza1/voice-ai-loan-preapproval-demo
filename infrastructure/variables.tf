@@ -4,8 +4,20 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "elevenlabs_api_key" {
-  description = "ElevenLabs API key"
+variable "cartesia_api_key" {
+  description = "Cartesia API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "cartesia_welcome_voice_id" {
+  description = "Cartesia Welcome Voice ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "cartesia_loan_voice_id" {
+  description = "Cartesia Loan voice ID"
   type        = string
   sensitive   = true
 }

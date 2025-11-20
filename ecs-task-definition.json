@@ -31,8 +31,16 @@
       ],
       "secrets": [
         {
-          "name": "ELEVENLABS_API_KEY",
-          "valueFrom": "${SECRETS_ARN}:ELEVENLABS_API_KEY::"
+          "name": "CARTESIA_API_KEY",
+          "valueFrom": "${SECRETS_ARN}:CARTESIA_API_KEY::"
+        },
+        {
+          "name": "CARTESIA_WELCOME_VOICE_ID",
+          "valueFrom": "${SECRETS_ARN}:CARTESIA_WELCOME_VOICE_ID::"
+        },
+        {
+          "name": "CARTESIA_LOAN_VOICE_ID",
+          "valueFrom": "${SECRETS_ARN}:CARTESIA_LOAN_VOICE_ID::"
         },
         {
           "name": "DEEPGRAM_API_KEY",

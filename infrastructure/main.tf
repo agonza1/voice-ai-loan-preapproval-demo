@@ -140,7 +140,9 @@ resource "aws_secretsmanager_secret" "api_keys" {
 resource "aws_secretsmanager_secret_version" "api_keys" {
   secret_id = aws_secretsmanager_secret.api_keys.id
   secret_string = jsonencode({
-    ELEVENLABS_API_KEY  = var.elevenlabs_api_key
+    CARTESIA_API_KEY  = var.cartesia_api_key
+    CARTESIA_WELCOME_VOICE_ID = var.cartesia_welcome_voice_id
+    CARTESIA_LOAN_VOICE_ID = var.cartesia_loan_voice_id
     DEEPGRAM_API_KEY    = var.deepgram_api_key
     OPENAI_API_KEY      = var.openai_api_key
     TWILIO_ACCOUNT_SID  = var.twilio_account_sid
